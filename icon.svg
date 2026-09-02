@@ -1,0 +1,38 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f2540"/>
+      <stop offset="100%" stop-color="#173a63"/>
+    </linearGradient>
+    <linearGradient id="boltGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffc94a"/>
+      <stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Hintergrund: abgerundetes Quadrat -->
+  <rect x="0" y="0" width="512" height="512" rx="96" fill="url(#bgGrad)"/>
+
+  <!-- Dokument-Silhouette im Hintergrund, leicht versetzt -->
+  <g opacity="0.16">
+    <rect x="150" y="120" width="150" height="200" rx="10" fill="#ffffff"/>
+    <rect x="172" y="150" width="106" height="10" rx="5" fill="#0f2540"/>
+    <rect x="172" y="175" width="106" height="10" rx="5" fill="#0f2540"/>
+    <rect x="172" y="200" width="70" height="10" rx="5" fill="#0f2540"/>
+  </g>
+
+  <!-- Blitz-Symbol (Elektro) zentral, groß -->
+  <path d="M 286 96
+           L 176 296
+           L 246 296
+           L 216 424
+           L 356 226
+           L 280 226
+           Z"
+        fill="url(#boltGrad)" stroke="#0f2540" stroke-width="6" stroke-linejoin="round"/>
+
+  <!-- Haken / Prüfsymbol, sitzt am unteren Blitz-Ende: Dokumentation & Prüfung -->
+  <circle cx="358" cy="360" r="58" fill="#0f2540" stroke="#ffc94a" stroke-width="6"/>
+  <path d="M 332 360 L 350 380 L 388 336" fill="none" stroke="#ffc94a" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+
+</svg>

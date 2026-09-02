@@ -6,6 +6,10 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="Prüfprotokoll" />
+<meta name="theme-color" content="#123657" />
+<link rel="manifest" href="./manifest.json" />
+<link rel="apple-touch-icon" href="./icon.svg" />
+<link rel="icon" href="./icon.svg" type="image/svg+xml" />
 <title>Prüfprotokoll Erfassung</title>
 <style>
   :root {
@@ -13423,6 +13427,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   protokolle = protokolleLaden();
   zeigeListe();
 })();
+</script>
+
+<script>
+// Service Worker fuer Offline-Nutzung: einmal mit Internet laden, danach cached und
+// funktioniert komplett ohne Netz (siehe sw.js daneben). Scheitert das Registrieren
+// (z.B. weil ueber file:// ohne Server geoeffnet), laeuft die App trotzdem normal weiter.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js').catch(function () { /* egal, App funktioniert trotzdem */ });
+  });
+}
 </script>
 </body>
 </html>

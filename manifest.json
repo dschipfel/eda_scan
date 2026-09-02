@@ -1,0 +1,13 @@
+{
+  "name": "Prüfprotokoll Erfassung",
+  "short_name": "Prüfprotokoll",
+  "description": "Stromkreis-Messzeilen erfassen und per QR-Code mit dem EDA-Notebook austauschen.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f2f5f8",
+  "theme_color": "#123657",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
