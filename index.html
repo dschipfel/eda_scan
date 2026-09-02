@@ -160,9 +160,25 @@
     padding: 10px 12px; background: var(--flaeche-kopf); border-bottom: 1px solid var(--rand);
     -webkit-user-select: none; user-select: none;
   }
-  .zeile-kopf .titel { font-weight: 600; font-size: 14px; }
-  .zeile-kopf .untertitel { font-size: 12px; color: var(--grau); font-weight: 400; }
+  .zeile-kopf-titel-wrap { flex: 1; min-width: 0; cursor: pointer; }
+  .zeile-kopf .titel { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px; }
+  .zeile-kopf .chevron { color: var(--grau); font-size: 11px; width: 10px; display: inline-block; }
+  .zeile-kopf .untertitel {
+    font-size: 12px; color: var(--grau); font-weight: 400;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
   .zeile-kopf-aktionen { display: flex; align-items: center; gap: 6px; }
+
+  .auswahl-karte {
+    background: var(--flaeche); border: 1px solid var(--rand); border-radius: 12px;
+    padding: 10px 12px; margin-bottom: 14px;
+  }
+  .hinweiskarte-klein { margin: 0 0 8px 0; font-size: 11.5px; color: var(--grau); line-height: 1.35; }
+  .auswahl-reihe { display: flex; flex-wrap: wrap; gap: 12px 18px; }
+  .auswahl-gruppe { display: flex; flex-direction: column; gap: 4px; }
+  .auswahl-titel { font-size: 11px; text-transform: uppercase; letter-spacing: 0.03em; color: var(--grau); }
+  .auswahl-radio { display: flex; align-items: center; gap: 6px; font-size: 13.5px; }
+  .auswahl-radio input { margin: 0; }
   .icon-btn {
     border: none; background: transparent; color: var(--grau);
     font-size: 18px; line-height: 1; padding: 6px 8px; border-radius: 8px;
@@ -293,6 +309,27 @@
     <div class="label-feld">
       <label>Bezeichnung (nur zur eigenen Orientierung, wird nicht mit übertragen)</label>
       <input type="text" id="editor-label" autocomplete="off" autocapitalize="off" spellcheck="false" />
+    </div>
+
+    <div class="auswahl-karte">
+      <p class="hinweiskarte-klein">Gelten fürs ganze Blatt, nicht je Zeile — wie im Tabellenkopf am Notebook.</p>
+      <div class="auswahl-reihe">
+        <div class="auswahl-gruppe">
+          <div class="auswahl-titel">Innenwiderstand (L-N)</div>
+          <label class="auswahl-radio"><input type="radio" name="auswahl-innenwiderstand" id="radio-innenwiderstand-zi" value="Zi" /> Z<sub>I</sub> [Ω]</label>
+          <label class="auswahl-radio"><input type="radio" name="auswahl-innenwiderstand" id="radio-innenwiderstand-ik" value="Ik" /> I<sub>K</sub> [A]</label>
+        </div>
+        <div class="auswahl-gruppe">
+          <div class="auswahl-titel">Schleifenwiderstand (L-PE)</div>
+          <label class="auswahl-radio"><input type="radio" name="auswahl-schleifenwiderstand" id="radio-schleifenwiderstand-zs" value="Zs" /> Z<sub>S</sub> [Ω]</label>
+          <label class="auswahl-radio"><input type="radio" name="auswahl-schleifenwiderstand" id="radio-schleifenwiderstand-ik" value="Ik" /> I<sub>K</sub> [A]</label>
+        </div>
+        <div class="auswahl-gruppe">
+          <div class="auswahl-titel">Fehlerstromschutzeinrichtung</div>
+          <label class="auswahl-radio"><input type="radio" name="auswahl-fityp" id="radio-fityp-b" value="TypB" /> Typ B</label>
+          <label class="auswahl-radio"><input type="radio" name="auswahl-fityp" id="radio-fityp-af" value="TypAF" /> Typ A/F</label>
+        </div>
+      </div>
     </div>
 
     <div class="aktionen-oben">
@@ -12785,7 +12822,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   var US = '\x1f'; // Unit Separator — trennt Felder innerhalb einer Zeile
   var RS = '\x1e'; // Record Separator — trennt Zeilen voneinander
   var GS = '\x1d'; // Group Separator — trennt die Kopf-Felder des Chunks
-  var MAGIC = 'EDA-PP2'; // v2: Kopf enthält zusätzlich ein Label
+  var MAGIC = 'EDA-PP3'; // v3: Kopf enthält zusätzlich Label + die drei Auswahlkästchen (Zi/Ik, Zs/Ik, TypB/A-F)
   var MAX_BYTES_PRO_CHUNK = 450;
 
   // Reihenfolge und Schlüssel müssen exakt zu leereZeile() in PruefprotokollFormModal.vue passen.
@@ -12822,7 +12859,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       { key: 'fiPulsTa', label: 'tA [ms]' },
       { key: 'fiPulsUb', label: 'UB [V]' },
     ]},
-    { titel: 'Gleichstrom (nur bei Typ B)', felder: [
+    { titel: 'Gleichstrom (nur bei Typ B)', gleichstromGruppe: true, felder: [
       { key: 'fiGleichImess', label: 'Imess [mA]' },
       { key: 'fiGleichTa', label: 'tA [ms]' },
       { key: 'fiGleichUb', label: 'UB [V]' },
@@ -12845,7 +12882,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
   function neuesProtokoll(label) {
     var jetzt = new Date().toISOString();
-    return { id: neueId(), label: label || 'Neues Prüfprotokoll', zeilen: [], erstelltAm: jetzt, aktualisiertAm: jetzt };
+    return {
+      id: neueId(), label: label || 'Neues Prüfprotokoll', zeilen: [], erstelltAm: jetzt, aktualisiertAm: jetzt,
+      // Die drei Auswahlkästchen-Paare gelten fürs ganze Blatt (wie im Tabellenkopf am Notebook),
+      // nicht je Messzeile — "" = nichts ausgewählt.
+      innenwiderstandArt: '', schleifenwiderstandArt: '', fiTyp: '',
+    };
   }
 
   // ---------------------------------------------------------------------
@@ -13001,6 +13043,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   var btnQrErzeugen = document.getElementById('btn-qr-erzeugen');
   var btnProtokollLoeschen = document.getElementById('btn-protokoll-loeschen');
   var editorLabelInput = document.getElementById('editor-label');
+  var radioInnenwiderstandZi = document.getElementById('radio-innenwiderstand-zi');
+  var radioInnenwiderstandIk = document.getElementById('radio-innenwiderstand-ik');
+  var radioSchleifenwiderstandZs = document.getElementById('radio-schleifenwiderstand-zs');
+  var radioSchleifenwiderstandIk = document.getElementById('radio-schleifenwiderstand-ik');
+  var radioFiTypB = document.getElementById('radio-fityp-b');
+  var radioFiTypAf = document.getElementById('radio-fityp-af');
 
   function rendereEditor() {
     var p = aktuellesProtokoll();
@@ -13008,6 +13056,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     if (p.zeilen.length === 0) p.zeilen.push(leereZeile());
 
     editorLabelInput.value = p.label;
+    // Ältere, vor dieser Version gespeicherte Protokolle haben diese Felder noch nicht -> '' als Default.
+    radioInnenwiderstandZi.checked = p.innenwiderstandArt === 'Zi';
+    radioInnenwiderstandIk.checked = p.innenwiderstandArt === 'Ik';
+    radioSchleifenwiderstandZs.checked = p.schleifenwiderstandArt === 'Zs';
+    radioSchleifenwiderstandIk.checked = p.schleifenwiderstandArt === 'Ik';
+    radioFiTypB.checked = p.fiTyp === 'TypB';
+    radioFiTypAf.checked = p.fiTyp === 'TypAF';
+    var gleichstromDeaktiviert = p.fiTyp === 'TypAF';
 
     zeilenListeEl.innerHTML = '';
     editorLeerHinweisEl.hidden = p.zeilen.length > 0;
@@ -13021,16 +13077,32 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
       var kopf = document.createElement('div');
       kopf.className = 'zeile-kopf';
+
       var titelWrap = document.createElement('div');
+      titelWrap.className = 'zeile-kopf-titel-wrap';
       var titel = document.createElement('div');
       titel.className = 'titel';
-      titel.textContent = 'Zeile ' + (index + 1);
+      var chevron = document.createElement('span');
+      chevron.className = 'chevron';
+      chevron.textContent = z.__eingeklappt ? '▸' : '▾';
+      titel.appendChild(chevron);
+      titel.appendChild(document.createTextNode('Zeile ' + (index + 1)));
       var untertitel = document.createElement('div');
       untertitel.className = 'untertitel';
-      var beschreibung = [z.stromkreisNr, z.zielbezeichnung].filter(Boolean).join(' · ');
-      untertitel.textContent = beschreibung || 'leer';
+      function untertitelAktualisieren() {
+        // Eingeklappt: nur der Stromkreis, damit man schnell durch alle Zeilen scrollen kann.
+        untertitel.textContent = z.__eingeklappt
+          ? (z.stromkreisNr || 'leer')
+          : ([z.stromkreisNr, z.zielbezeichnung].filter(Boolean).join(' · ') || 'leer');
+      }
+      untertitelAktualisieren();
       titelWrap.appendChild(titel);
       titelWrap.appendChild(untertitel);
+      titelWrap.addEventListener('click', function () {
+        z.__eingeklappt = !z.__eingeklappt;
+        protokolleSpeichern();
+        rendereEditor();
+      });
       kopf.appendChild(titelWrap);
 
       var aktionen = document.createElement('div');
@@ -13039,7 +13111,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       loeschenBtn.type = 'button';
       loeschenBtn.className = 'icon-btn loeschen';
       loeschenBtn.textContent = '✕';
-      loeschenBtn.addEventListener('click', function () {
+      loeschenBtn.addEventListener('click', function (ev) {
+        ev.stopPropagation();
         p.zeilen.splice(index, 1);
         p.aktualisiertAm = new Date().toISOString();
         protokolleSpeichern();
@@ -13049,41 +13122,48 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       kopf.appendChild(aktionen);
       karte.appendChild(kopf);
 
-      FELD_GRUPPEN.forEach(function (gruppe) {
-        var gruppeEl = document.createElement('div');
-        gruppeEl.className = 'gruppe';
-        var gruppeTitel = document.createElement('div');
-        gruppeTitel.className = 'gruppe-titel';
-        gruppeTitel.textContent = gruppe.titel;
-        gruppeEl.appendChild(gruppeTitel);
+      if (!z.__eingeklappt) {
+        FELD_GRUPPEN.forEach(function (gruppe) {
+          var istGleichstrom = !!gruppe.gleichstromGruppe;
+          var gruppeEl = document.createElement('div');
+          gruppeEl.className = 'gruppe';
+          var gruppeTitel = document.createElement('div');
+          gruppeTitel.className = 'gruppe-titel';
+          gruppeTitel.textContent = gruppe.titel + (istGleichstrom && gleichstromDeaktiviert ? ' (entfällt)' : '');
+          gruppeEl.appendChild(gruppeTitel);
 
-        var grid = document.createElement('div');
-        grid.className = 'feld-grid';
-        gruppe.felder.forEach(function (feld) {
-          var feldEl = document.createElement('div');
-          feldEl.className = 'feld' + (feld.breit ? ' breit' : '');
-          var label = document.createElement('label');
-          label.textContent = feld.label;
-          var input = document.createElement('input');
-          input.type = 'text';
-          input.autocomplete = 'off';
-          input.autocapitalize = 'off';
-          input.spellcheck = false;
-          input.value = z[feld.key];
-          input.addEventListener('input', function () {
-            z[feld.key] = input.value;
-            untertitel.textContent = [z.stromkreisNr, z.zielbezeichnung].filter(Boolean).join(' · ') || 'leer';
-            btnQrErzeugen.disabled = !p.zeilen.some(irgendeinFeldGefuellt);
-            p.aktualisiertAm = new Date().toISOString();
-            protokolleSpeichern();
+          var grid = document.createElement('div');
+          grid.className = 'feld-grid';
+          gruppe.felder.forEach(function (feld) {
+            var feldEl = document.createElement('div');
+            feldEl.className = 'feld' + (feld.breit ? ' breit' : '');
+            var label = document.createElement('label');
+            label.textContent = feld.label;
+            var input = document.createElement('input');
+            input.type = 'text';
+            input.autocomplete = 'off';
+            input.autocapitalize = 'off';
+            input.spellcheck = false;
+            input.value = z[feld.key];
+            if (istGleichstrom && gleichstromDeaktiviert) {
+              input.disabled = true;
+              input.placeholder = '--';
+            }
+            input.addEventListener('input', function () {
+              z[feld.key] = input.value;
+              untertitelAktualisieren();
+              btnQrErzeugen.disabled = !p.zeilen.some(irgendeinFeldGefuellt);
+              p.aktualisiertAm = new Date().toISOString();
+              protokolleSpeichern();
+            });
+            feldEl.appendChild(label);
+            feldEl.appendChild(input);
+            grid.appendChild(feldEl);
           });
-          feldEl.appendChild(label);
-          feldEl.appendChild(input);
-          grid.appendChild(feldEl);
+          gruppeEl.appendChild(grid);
+          karte.appendChild(gruppeEl);
         });
-        gruppeEl.appendChild(grid);
-        karte.appendChild(gruppeEl);
-      });
+      }
 
       zeilenListeEl.appendChild(karte);
     });
@@ -13096,6 +13176,21 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     p.aktualisiertAm = new Date().toISOString();
     protokolleSpeichern();
   });
+
+  function auswahlAendern(feld, wert) {
+    var p = aktuellesProtokoll();
+    if (!p) return;
+    p[feld] = wert;
+    p.aktualisiertAm = new Date().toISOString();
+    protokolleSpeichern();
+    rendereEditor(); // neu rendern, da Zi/Zs/FiTyp die Gleichstrom-Sperre je Zeile beeinflussen
+  }
+  radioInnenwiderstandZi.addEventListener('change', function () { auswahlAendern('innenwiderstandArt', 'Zi'); });
+  radioInnenwiderstandIk.addEventListener('change', function () { auswahlAendern('innenwiderstandArt', 'Ik'); });
+  radioSchleifenwiderstandZs.addEventListener('change', function () { auswahlAendern('schleifenwiderstandArt', 'Zs'); });
+  radioSchleifenwiderstandIk.addEventListener('change', function () { auswahlAendern('schleifenwiderstandArt', 'Ik'); });
+  radioFiTypB.addEventListener('change', function () { auswahlAendern('fiTyp', 'TypB'); });
+  radioFiTypAf.addEventListener('change', function () { auswahlAendern('fiTyp', 'TypAF'); });
 
   btnZeileHinzu.addEventListener('click', function () {
     var p = aktuellesProtokoll();
@@ -13146,9 +13241,12 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     return z;
   }
 
-  function chunksErzeugen(gefuellteZeilen, label) {
+  function chunksErzeugen(gefuellteZeilen, label, innenwiderstandArt, schleifenwiderstandArt, fiTyp) {
     var sessionId = Math.random().toString(36).slice(2, 6).toUpperCase();
     var labelSauber = saeubern(label);
+    var innenwiderstandArtSauber = saeubern(innenwiderstandArt);
+    var schleifenwiderstandArtSauber = saeubern(schleifenwiderstandArt);
+    var fiTypSauber = saeubern(fiTyp);
     var zeilenStrings = gefuellteZeilen.map(function (z, i) { return zeileZuFeldstring(z, i); });
 
     var gruppen = [];
@@ -13168,7 +13266,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
     var chunkCount = gruppen.length;
     return gruppen.map(function (rowsInChunk, idx) {
-      var kopf = [MAGIC, sessionId, String(idx + 1), String(chunkCount), labelSauber].join(GS);
+      var kopf = [
+        MAGIC, sessionId, String(idx + 1), String(chunkCount),
+        labelSauber, innenwiderstandArtSauber, schleifenwiderstandArtSauber, fiTypSauber,
+      ].join(GS);
       return kopf + RS + rowsInChunk.join(RS);
     });
   }
@@ -13213,7 +13314,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     if (!p) return;
     var gefuellteZeilen = p.zeilen.filter(irgendeinFeldGefuellt);
     if (gefuellteZeilen.length === 0) return;
-    sendenChunks = chunksErzeugen(gefuellteZeilen, p.label);
+    sendenChunks = chunksErzeugen(gefuellteZeilen, p.label, p.innenwiderstandArt, p.schleifenwiderstandArt, p.fiTyp);
     sendenIndex = 0;
     sendenOverlayEl.hidden = false;
     sendenAnsichtRendern();
@@ -13257,12 +13358,15 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     var ersteRS = text.indexOf(RS);
     if (ersteRS === -1) return;
     var kopfTeile = text.slice(0, ersteRS).split(GS);
-    if (kopfTeile.length !== 5 || kopfTeile[0] !== MAGIC) return; // kein/anderer/veralteter EDA-QR-Code
+    if (kopfTeile.length !== 8 || kopfTeile[0] !== MAGIC) return; // kein/anderer/veralteter EDA-QR-Code
 
     var sessionId = kopfTeile[1];
     var chunkIndex = parseInt(kopfTeile[2], 10);
     var chunkCount = parseInt(kopfTeile[3], 10);
     var label = kopfTeile[4];
+    var innenwiderstandArt = kopfTeile[5];
+    var schleifenwiderstandArt = kopfTeile[6];
+    var fiTyp = kopfTeile[7];
     if (!isFinite(chunkIndex) || !isFinite(chunkCount)) return;
 
     if (empfangenSessionId !== sessionId) {
@@ -13278,7 +13382,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       .filter(function (teile) { return teile.length === FELD_KEYS.length + 1; })
       .map(function (teile) { return { reihenfolge: parseInt(teile[0], 10), zeile: zeileAusFeldern(teile.slice(1)) }; });
 
-    empfangenChunks.set(chunkIndex, { label: label, zeilen: zeilen });
+    empfangenChunks.set(chunkIndex, {
+      label: label, zeilen: zeilen,
+      innenwiderstandArt: innenwiderstandArt, schleifenwiderstandArt: schleifenwiderstandArt, fiTyp: fiTyp,
+    });
     empfangenFortschrittAktualisieren();
     empfangenZuletztEl.textContent = 'Code ' + chunkIndex + ' von ' + chunkCount + ' erkannt';
 
@@ -13290,8 +13397,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   function empfangenUebernehmen() {
     var alleZeilen = [];
     var label = '';
+    var innenwiderstandArt = '';
+    var schleifenwiderstandArt = '';
+    var fiTyp = '';
     empfangenChunks.forEach(function (chunk) {
       if (chunk.label) label = chunk.label;
+      if (chunk.innenwiderstandArt) innenwiderstandArt = chunk.innenwiderstandArt;
+      if (chunk.schleifenwiderstandArt) schleifenwiderstandArt = chunk.schleifenwiderstandArt;
+      if (chunk.fiTyp) fiTyp = chunk.fiTyp;
       alleZeilen = alleZeilen.concat(chunk.zeilen);
     });
     alleZeilen.sort(function (a, b) { return a.reihenfolge - b.reihenfolge; });
@@ -13316,6 +13429,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       ziel.zeilen = importierteZeilen;
       protokolle.push(ziel);
     }
+    if (innenwiderstandArt) ziel.innenwiderstandArt = innenwiderstandArt;
+    if (schleifenwiderstandArt) ziel.schleifenwiderstandArt = schleifenwiderstandArt;
+    if (fiTyp) ziel.fiTyp = fiTyp;
     ziel.aktualisiertAm = new Date().toISOString();
     protokolleSpeichern();
 
