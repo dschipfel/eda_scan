@@ -137,6 +137,11 @@
   .protokoll-karte .loeschen-btn:active { background: var(--gefahr-flaeche); }
 
   .leer-hinweis { text-align: center; color: var(--grau); font-size: 13.5px; padding: 30px 10px; }
+  .versions-info {
+    margin-top: 24px; padding-top: 12px; border-top: 1px solid var(--rand);
+    text-align: center; font-size: 11px; color: var(--grau); line-height: 1.6;
+    font-variant-numeric: tabular-nums;
+  }
 
   /* ---------- Editor ---------- */
   .label-feld { margin-bottom: 14px; }
@@ -302,6 +307,7 @@
     </div>
     <div id="protokoll-liste"></div>
     <div id="liste-leer-hinweis" class="leer-hinweis" hidden>Noch keine Prüfprotokolle.</div>
+    <div id="versions-info" class="versions-info"></div>
   </div>
 
   <!-- ===================== Editor-Ansicht ===================== -->
@@ -12813,6 +12819,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 (function () {
   'use strict';
 
+  // Bei jedem inhaltlichen Update von index.html hier hochzählen (zusammen mit CACHE_NAME
+  // in sw.js) — wird auf der Übersicht angezeigt, damit man auf einen Blick sieht, ob das
+  // Gerät die neueste Version geladen hat (siehe README, Abschnitt Offline-Fähigkeit).
+  var APP_VERSION = 'v3 · 2026-09-02';
+
   var MAX_ZEILEN = 13;
   var SPEICHER_SCHLUESSEL = 'eda-pp-protokolle-v1';
   var ALTER_ENTWURF_SCHLUESSEL = 'eda-pp-messzeilen-v1'; // Vorgänger-Version (Einzel-Entwurf), zur Migration
@@ -12977,6 +12988,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   // ---------------------------------------------------------------------
   var protokollListeEl = document.getElementById('protokoll-liste');
   var listeLeerHinweisEl = document.getElementById('liste-leer-hinweis');
+  var versionsInfoEl = document.getElementById('versions-info');
 
   function formatiereDatum(iso) {
     try {
@@ -12985,10 +12997,37 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     } catch (e) { return ''; }
   }
 
+  // Zeigt App-Version + Service-Worker-Status/Cache-Name — zum Prüfen, ob ein Gerät
+  // wirklich die neueste Version geladen hat (siehe README, Offline-Fähigkeit).
+  function versionsInfoAktualisieren() {
+    var zeilen = ['Version ' + APP_VERSION];
+
+    if (!('serviceWorker' in navigator)) {
+      zeilen.push('Kein Service Worker (kein Offline-Modus)');
+      versionsInfoEl.textContent = zeilen.join(' · ');
+      return;
+    }
+
+    navigator.serviceWorker.getRegistration().then(function (reg) {
+      if (!reg || !reg.active) {
+        zeilen.push('Service Worker: nicht aktiv');
+      } else {
+        zeilen.push('Offline-Modus: aktiv');
+      }
+      return caches.keys();
+    }).then(function (namen) {
+      zeilen.push(namen && namen.length ? 'Zwischenspeicher: ' + namen.join(', ') : 'Zwischenspeicher: leer');
+      versionsInfoEl.textContent = zeilen.join(' · ');
+    }).catch(function () {
+      versionsInfoEl.textContent = zeilen.join(' · ');
+    });
+  }
+
   function rendereListe() {
     protokollListeEl.innerHTML = '';
     var sortiert = protokolle.slice().sort(function (a, b) { return (b.aktualisiertAm || '').localeCompare(a.aktualisiertAm || ''); });
     listeLeerHinweisEl.hidden = sortiert.length > 0;
+    versionsInfoAktualisieren();
 
     sortiert.forEach(function (p) {
       var karte = document.createElement('div');
@@ -13549,9 +13588,31 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 // Service Worker fuer Offline-Nutzung: einmal mit Internet laden, danach cached und
 // funktioniert komplett ohne Netz (siehe sw.js daneben). Scheitert das Registrieren
 // (z.B. weil ueber file:// ohne Server geoeffnet), laeuft die App trotzdem normal weiter.
+//
+// Erkennt eine neue sw.js-Version automatisch und aktiviert sie sofort (statt erst beim
+// naechsten manuellen Neustart) -- sonst bleibt v.a. die vom Home-Bildschirm gestartete
+// Version sonst auf dem Stand haengen, an dem sie zuletzt den Service Worker installiert hat.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function () {
-    navigator.serviceWorker.register('./sw.js').catch(function () { /* egal, App funktioniert trotzdem */ });
+    navigator.serviceWorker.register('./sw.js').then(function (reg) {
+      if (reg.waiting) reg.waiting.postMessage('skipWaiting');
+      reg.addEventListener('updatefound', function () {
+        var neuer = reg.installing;
+        if (!neuer) return;
+        neuer.addEventListener('statechange', function () {
+          if (neuer.state === 'installed' && navigator.serviceWorker.controller) {
+            neuer.postMessage('skipWaiting');
+          }
+        });
+      });
+    }).catch(function () { /* egal, App funktioniert trotzdem */ });
+
+    var schonNeuGeladen = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function () {
+      if (schonNeuGeladen) return;
+      schonNeuGeladen = true;
+      location.reload();
+    });
   });
 }
 </script>
