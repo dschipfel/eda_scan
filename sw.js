@@ -10,7 +10,7 @@
 // Version und durchläuft den Install/Activate-Zyklus erneut -- sonst bleibt für immer die
 // zuerst installierte Version aktiv, egal wie oft index.html aktualisiert wird.
 
-const CACHE_NAME = 'pp-erfassung-v4';
+const CACHE_NAME = 'pp-erfassung-v5';
 const PRECACHE_URLS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', (event) => {

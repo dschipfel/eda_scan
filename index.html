@@ -12819,10 +12819,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 (function () {
   'use strict';
 
-  // Bei jedem inhaltlichen Update von index.html hier hochzählen (zusammen mit CACHE_NAME
-  // in sw.js) — wird auf der Übersicht angezeigt, damit man auf einen Blick sieht, ob das
-  // Gerät die neueste Version geladen hat (siehe README, Abschnitt Offline-Fähigkeit).
-  var APP_VERSION = 'v4 · 2026-09-02';
+  // Muss bei jedem EDA-Release auf dieselbe Versionsnummer wie <Version> in
+  // src/EDA.Host/EDA.Host.csproj gesetzt werden — wird auf der Übersicht angezeigt,
+  // damit man auf einen Blick sieht, ob dieses Gerät zur gerade installierten EDA.exe
+  // passt (siehe README, Abschnitt Offline-Fähigkeit). Für Inhalts-Änderungen an sich,
+  // die nichts mit einem EDA-Release zu tun haben, dient CACHE_NAME in sw.js (separat
+  // hochzählen, siehe dort) als Signal für den Service Worker.
+  var APP_VERSION = '0.5.0';
 
   var MAX_ZEILEN = 13;
   var SPEICHER_SCHLUESSEL = 'eda-pp-protokolle-v1';
