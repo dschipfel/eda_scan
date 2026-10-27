@@ -156,6 +156,10 @@
     margin-bottom: 10px; font-size: 13px; color: var(--grau);
   }
 
+  .blatt-trenner {
+    margin: 4px 0 8px; padding: 6px 10px; font-size: 13px; font-weight: 600;
+    color: #666; background: rgba(0, 0, 0, 0.06); border-radius: 8px;
+  }
   .zeile-karte {
     background: var(--flaeche); border: 1px solid var(--rand); border-radius: 12px;
     margin-bottom: 12px; overflow: hidden;
@@ -340,6 +344,7 @@
 
     <div class="aktionen-oben">
       <button type="button" class="sekundaer" id="btn-zeile-hinzu">+ Zeile</button>
+      <button type="button" class="sekundaer" id="btn-blatt-hinzu">+ Weiteres Blatt</button>
     </div>
 
     <div class="zaehler">
@@ -12825,9 +12830,9 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   // passt (siehe README, Abschnitt Offline-Fähigkeit). Für Inhalts-Änderungen an sich,
   // die nichts mit einem EDA-Release zu tun haben, dient CACHE_NAME in sw.js (separat
   // hochzählen, siehe dort) als Signal für den Service Worker.
-  var APP_VERSION = '0.9.4';
+  var APP_VERSION = '0.9.5';
 
-  var MAX_ZEILEN = 13;
+  var BLATT_ZEILEN = 13; // Messzeilen pro Blatt (wie auf dem Papierformular) — kein Limit der Blattanzahl
   var SPEICHER_SCHLUESSEL = 'eda-pp-protokolle-v1';
   var ALTER_ENTWURF_SCHLUESSEL = 'eda-pp-messzeilen-v1'; // Vorgänger-Version (Einzel-Entwurf), zur Migration
 
@@ -13044,7 +13049,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       var anzahl = p.zeilen.filter(irgendeinFeldGefuellt).length;
       var meta = document.createElement('div');
       meta.className = 'meta';
-      meta.textContent = anzahl + ' von ' + MAX_ZEILEN + ' Zeilen · ' + formatiereDatum(p.aktualisiertAm);
+      meta.textContent = anzahl + ' Zeilen · ' + blattAnzahlVon(p.zeilen) + ' Blatt/Blätter · ' + formatiereDatum(p.aktualisiertAm);
       info.appendChild(label);
       info.appendChild(meta);
       info.addEventListener('click', function () { zeigeEditor(p.id); });
@@ -13082,6 +13087,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   var editorLeerHinweisEl = document.getElementById('editor-leer-hinweis');
   var zaehlerEl = document.getElementById('zeilen-anzahl-text');
   var btnZeileHinzu = document.getElementById('btn-zeile-hinzu');
+  var btnBlattHinzu = document.getElementById('btn-blatt-hinzu');
   var btnQrErzeugen = document.getElementById('btn-qr-erzeugen');
   var btnProtokollLoeschen = document.getElementById('btn-protokoll-loeschen');
   var editorLabelInput = document.getElementById('editor-label');
@@ -13109,11 +13115,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
     zeilenListeEl.innerHTML = '';
     editorLeerHinweisEl.hidden = p.zeilen.length > 0;
-    zaehlerEl.textContent = p.zeilen.length + ' von ' + MAX_ZEILEN + ' Zeilen';
-    btnZeileHinzu.disabled = p.zeilen.length >= MAX_ZEILEN;
+    zaehlerEl.textContent = p.zeilen.length + ' Zeilen · ' + blattAnzahlVon(p.zeilen) + ' Blatt/Blätter';
     btnQrErzeugen.disabled = !p.zeilen.some(irgendeinFeldGefuellt);
 
     p.zeilen.forEach(function (z, index) {
+      if (blattAnzahlVon(p.zeilen) > 1 && index % BLATT_ZEILEN === 0) {
+        var trenner = document.createElement('div');
+        trenner.className = 'blatt-trenner';
+        trenner.textContent = 'Blatt ' + (index / BLATT_ZEILEN + 1);
+        zeilenListeEl.appendChild(trenner);
+      }
       var karte = document.createElement('div');
       karte.className = 'zeile-karte';
 
@@ -13236,7 +13247,18 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
   btnZeileHinzu.addEventListener('click', function () {
     var p = aktuellesProtokoll();
-    if (!p || p.zeilen.length >= MAX_ZEILEN) return;
+    if (!p) return;
+    p.zeilen.push(leereZeile());
+    p.aktualisiertAm = new Date().toISOString();
+    protokolleSpeichern();
+    rendereEditor();
+  });
+
+  // Beginnt ein neues Blatt: das aktuelle wird mit Leerzeilen aufgefüllt, danach folgt die erste Zeile des neuen Blatts.
+  btnBlattHinzu.addEventListener('click', function () {
+    var p = aktuellesProtokoll();
+    if (!p) return;
+    while (p.zeilen.length % BLATT_ZEILEN !== 0) p.zeilen.push(leereZeile());
     p.zeilen.push(leereZeile());
     p.aktualisiertAm = new Date().toISOString();
     protokolleSpeichern();
@@ -13277,6 +13299,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     return teile.join(US);
   }
 
+  function blattAnzahlVon(zeilen) {
+    return Math.max(1, Math.ceil(zeilen.length / BLATT_ZEILEN));
+  }
+
   function zeileAusFeldern(werte) {
     var z = leereZeile();
     FELD_KEYS.forEach(function (key, i) { z[key] = werte[i] || ''; });
@@ -13289,7 +13315,8 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     var innenwiderstandArtSauber = saeubern(innenwiderstandArt);
     var schleifenwiderstandArtSauber = saeubern(schleifenwiderstandArt);
     var fiTypSauber = saeubern(fiTyp);
-    var zeilenStrings = gefuellteZeilen.map(function (z, i) { return zeileZuFeldstring(z, i); });
+    // Jede Zeile trägt ihre echte Position (Leerzeilen zwischen/vor Blättern bleiben so erhalten).
+    var zeilenStrings = gefuellteZeilen.map(function (e) { return zeileZuFeldstring(e.zeile, e.position); });
 
     var gruppen = [];
     var aktuell = [];
@@ -13354,7 +13381,10 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   btnQrErzeugen.addEventListener('click', function () {
     var p = aktuellesProtokoll();
     if (!p) return;
-    var gefuellteZeilen = p.zeilen.filter(irgendeinFeldGefuellt);
+    var gefuellteZeilen = [];
+    p.zeilen.forEach(function (z, i) {
+      if (irgendeinFeldGefuellt(z)) gefuellteZeilen.push({ zeile: z, position: i });
+    });
     if (gefuellteZeilen.length === 0) return;
     sendenChunks = chunksErzeugen(gefuellteZeilen, p.label, p.innenwiderstandArt, p.schleifenwiderstandArt, p.fiTyp);
     sendenIndex = 0;
@@ -13450,7 +13480,13 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
       alleZeilen = alleZeilen.concat(chunk.zeilen);
     });
     alleZeilen.sort(function (a, b) { return a.reihenfolge - b.reihenfolge; });
-    var importierteZeilen = alleZeilen.slice(0, MAX_ZEILEN).map(function (z) { return z.zeile; });
+    // Nach Position einsortieren, Lücken (Leerzeilen) mit Leerzeilen füllen, damit die Blattgrenzen erhalten bleiben.
+    var importierteZeilen = [];
+    alleZeilen.forEach(function (z) {
+      var pos = isNaN(z.reihenfolge) || z.reihenfolge < importierteZeilen.length ? importierteZeilen.length : z.reihenfolge;
+      while (importierteZeilen.length < pos) importierteZeilen.push(leereZeile());
+      importierteZeilen.push(z.zeile);
+    });
     if (importierteZeilen.length === 0) importierteZeilen = [leereZeile()];
     if (!label) label = 'Vom Notebook empfangen';
 
